@@ -1,0 +1,587 @@
+﻿@using Grand.Business.Core.Interfaces.Catalog.Products
+@using Grand.Business.Core.Interfaces.Checkout.GiftVouchers
+@using Grand.Business.Core.Interfaces.Checkout.Payments
+@using Grand.Business.Core.Interfaces.Common.Directory
+@using Grand.Business.Core.Interfaces.Common.Localization
+@using Grand.Business.Core.Interfaces.Common.Stores
+@using Grand.Business.Core.Interfaces.Storage
+@using Grand.Domain.Orders;
+@using Grand.Domain.Tax;
+@using Misc.CzechInvoiceGenerator.Domain;
+@model (IList<Order>, string)
+@inject IProductService _productService
+@inject ICountryService _countryService
+@inject IStoreService _storeService
+@inject IPictureService _pictureService
+@inject PdfSettings _pdfSettings
+@inject ITranslationService _translationService
+@inject IPaymentService _paymentService
+@inject ICurrencyService _currencyService
+@inject IGiftVoucherService _giftVoucherService
+@inject IUserFieldService _userFieldService
+@{
+    var logoPicture = await _pictureService.GetPictureById(_pdfSettings.LogoPictureId);
+    var logoExists = logoPicture != null;
+    var limitbyVendor = !string.IsNullOrEmpty(Model.Item2);
+}
+<html lang="cs" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title></title>
+
+    <link rel="stylesheet" type="text/css" href="/Plugins/Misc.CzechInvoiceGenerator/Assets/css/invoice.css" asp-append-version="true" />
+
+    <style>
+        html {
+            font-family: Roboto, sans-serif;
+            font-size: 12pt;
+            color: #333;
+        }
+
+        body {
+            padding: 30pt;
+        }
+
+        .text-sm {
+            font-size: 10pt;
+        }
+
+        @@page {
+	        size: A4 Portrait;
+        }
+
+        table.table-no-border,
+        table.table-no-border td {
+            border: none; 
+            border-collapse: collapse;
+            padding: 0pt;
+        }
+
+        .summary {
+	        padding-top: 20px;
+        }
+
+        .footer {
+	        position: fixed;
+	        bottom: 0;
+	        width: 100%;
+        }
+
+
+        /* https://www.w3schools.com/html/html_table_borders.asp */
+        table.CodeTable {
+	        width: 100%;
+        }
+
+        .CodeTable .line {
+	        border-bottom: 1px solid #EEE;
+	        border-top: 1px solid #EEE;
+	        border-left: 1px solid #FFFFFF;
+	        border-right: 1px solid #FFFFFF;
+        }
+
+        table.CodeTable th,
+        table.CodeTable td {
+	        /* width: 100%; */
+	        /*border: 0px solid black;*/
+	        border: none;
+	        border-collapse: collapse;
+        }
+
+        .Header {
+	        background-color: grey;
+	        color: white;
+	        padding: 5px;
+        }
+
+        table.Table {
+	        width: 100%;
+        }
+
+	        table.Table,
+	        table.Table th,
+	        table.Table td {
+		        /*white-space: nowrap;*/
+		        text-align: left;
+		        /* border: 1px solid black; */
+		        border-collapse: collapse;
+	        }
+
+		        table.Table th,
+		        table.Table td {
+			        padding: 12px 8px 3px;
+			        text-align: right;
+		        }
+
+			        table.Table th.leftalign,
+			        table.Table td.leftalign {
+				        text-align: left;
+			        }
+
+		        table.Table th {
+			        padding-top: 5px;
+			        padding-bottom: 5px;
+			        border-bottom: 1px solid black;
+		        }
+
+			        table.Table th.first,
+			        table.Table td.first {
+				        text-align: left;
+				        width: 30px;
+			        }
+
+			        table.Table th.autoWidth,
+			        table.Table td.autoWidth {
+				        width: 200pt;
+			        }
+
+			        table.Table th.detailText,
+			        table.Table td.detailText {
+				        font-size: 10px;
+				        padding-top: 3px;
+				        padding-bottom: 2px;
+			        }
+
+        .bold {
+	        font-weight: bold;
+        }
+
+        table.Table tfoot {
+	        padding-top: 4px;
+	        border-top: 1px solid black;
+	        border-bottom: 1px solid black;
+        }
+
+	        table.Table tfoot tr,
+	        table.Table tfoot td {
+		        padding-top: 4px;
+		        padding-bottom: 4px;
+	        }
+
+        .font-bigger {
+            font-size: 12pt;
+            font-weight: bold;
+        }
+
+        .col-1 {
+	        column-count: 1;
+        }
+
+        .col-2 {
+	        column-count: 2;
+        }
+
+        .col-3 {
+	        column-count: 3;
+        }
+
+        .col-4 {
+	        column-count: 4;
+        }
+
+        .col {
+	        break-inside: avoid;
+	        break-after: always;
+        }
+    </style>
+</head>
+<body>
+    <main style="padding:10pt; font-size:14px">
+        @{
+            var i = 0;
+        }
+        @foreach (var order in Model.Item1)
+        {
+            var priceIncludesTax = order.CustomerTaxDisplayTypeId == TaxDisplayType.IncludingTax;
+            var store = await _storeService.GetStoreById(order.StoreId);
+            string invoiceNumber = await _userFieldService.GetFieldsForEntity<string>(order, InvoiceConstants.INVOICE_NUMBER_FIELD_KEY);
+            DateTime? invoiceEffectiveDate = await _userFieldService.GetFieldsForEntity<DateTime>(order, InvoiceConstants.INVOICE_EFFECTIVE_DATE_FIELD_KEY);
+            var paymentMethod = _paymentService.LoadPaymentMethodBySystemName(order.PaymentMethodSystemName);
+            var paymentMethodText = paymentMethod != null ? paymentMethod.FriendlyName : order.PaymentMethodSystemName;
+
+            <div class="col-2" style="margin-bottom: 20pt;">
+                <div class="col">
+                    @if (logoExists)
+                    {
+                        var logoUrl = await _pictureService.GetPictureUrl(logoPicture, 0, false, store.SslEnabled ? store.SecureUrl : store.Url);
+
+                        <img src="@logoUrl" title="logo" alt="logo" style="width: 200pt;" />
+                    }
+                </div>
+                <div style="text-align: right;">
+                    @if (priceIncludesTax)
+                    {
+                        <h6>Faktura - Daňový doklad @invoiceNumber</h6>
+                    }
+                    else
+                    {
+                        <h6>Faktura @invoiceNumber</h6>
+                    }
+                </div>
+            </div>
+            <div class="col-2" style="margin-bottom: 20pt;">
+                <div class="col">
+                    <table style="width: 100%;" class="table-no-border text-sm">
+                        <tbody>
+                            <tr>
+                                <td style="padding: 0pt;">Druh dokladu:</td>
+                                @if (priceIncludesTax)
+                                {
+                                    <td style="padding: 0pt;">Faktura - daňový doklad</td>
+                                }
+                                else
+                                {
+                                    <td style="padding: 0pt;">Faktura</td>
+                                }
+                            </tr>
+                            <tr>
+                                <td style="padding: 0pt;">Číslo dokladu:</td>
+                                <td style="padding: 0pt;">@invoiceNumber</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 0pt;">Zpracoval:</td>
+                                <td style="padding: 0pt;">eshop Nekton.cz</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p>Dodavatel:</p>
+                    <hr />
+                    <p style="font-weight: bold;">@store.CompanyName</p>
+                    <p>
+                        @Html.Raw(String.Join("<br />", store.CompanyAddress.Split(',')))
+                    </p>
+                    <p>
+                        @store.CompanyRegNo<br />
+                        @store.CompanyVat<br />
+                        @store.CompanyEmail, @store.CompanyPhoneNumber
+                    </p>
+                </div>
+                <div>
+                    <table style="width: 100%;" class="table-no-border text-sm">
+                        <tbody>
+                            <tr>
+                                <td style="padding: 0pt;">Datum vystavení:</td>
+                                <td style="padding: 0pt; text-align: right;">@invoiceEffectiveDate?.ToString("dd.MM.yyyy")</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 0pt;">Datum splatnosti:</td>
+                                <td style="padding: 0pt; text-align: right;">@invoiceEffectiveDate?.ToString("dd.MM.yyyy")</td>
+                            </tr>
+                            @if (priceIncludesTax)
+                            {
+                                <tr>
+                                    <td style="padding: 0pt;">Datum uskuteč. zd. plnění:</td>
+                                    <td style="padding: 0pt; text-align: right;">@order.CreatedOnUtc.ToString("dd.MM.yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <p>Odběratel:</p>
+                    <hr />
+                    <p style="font-weight: bold;">@(string.Format(_translationService.GetResource("PDFInvoice.Name", order.CustomerLanguageId), order.BillingAddress.FirstName + " " + order.BillingAddress.LastName))</p>
+                    @if (order.BillingAddress != null)
+                    {
+                        <p>
+                            @if (!string.IsNullOrEmpty(order.BillingAddress.Company))
+                            {
+                                @(string.Format(_translationService.GetResource("PDFInvoice.Company", order.CustomerLanguageId), order.BillingAddress.Company))
+                                <br />
+                            }
+                            @(string.Format(_translationService.GetResource("PDFInvoice.Address", order.CustomerLanguageId), order.BillingAddress.Address1))<br />
+                            @(order.BillingAddress.City + ", " + order.BillingAddress.ZipPostalCode)<br />
+                            @((await _countryService.GetCountryById(order.BillingAddress.CountryId))?.Name)<br />
+                            @(string.Format(_translationService.GetResource("PDFInvoice.Phone", order.CustomerLanguageId), order.BillingAddress.PhoneNumber))
+                        </p>
+                    }
+                    @if (order.ShippingAddress != null)
+                    {
+                        <p>
+                            @(string.Format(_translationService.GetResource("PDFInvoice.Name", order.CustomerLanguageId), order.ShippingAddress.FirstName + " " + order.ShippingAddress.LastName))<br />
+                            @if (!string.IsNullOrEmpty(order.ShippingAddress.Company))
+                            {
+                                @(string.Format(_translationService.GetResource("PDFInvoice.Company", order.CustomerLanguageId), order.ShippingAddress.Company))
+                                <br />
+                            }
+                            @(string.Format(_translationService.GetResource("PDFInvoice.Address", order.CustomerLanguageId), order.ShippingAddress.Address1))<br />
+                            @(order.ShippingAddress.City + ", " + order.ShippingAddress.ZipPostalCode)<br />
+                            @((await _countryService.GetCountryById(order.ShippingAddress.CountryId))?.Name)<br />
+                            @(string.Format(_translationService.GetResource("PDFInvoice.Phone", order.CustomerLanguageId), order.ShippingAddress.PhoneNumber))
+                        </p>
+                    }
+                    <p>@(string.Format(_translationService.GetResource("PDFInvoice.ShippingMethod", order.CustomerLanguageId), order.ShippingMethod))</p>
+                </div>
+            </div>
+            <div class="col-2" style="margin-bottom: 20pt;">
+                <div class="col">
+                    <p>Platební údaje:</p>
+                    <hr />
+                    <table style="width: 100%;" class="table-no-border text-sm">
+                        <tbody>
+                            <tr>
+                                <td style="padding: 0pt;">Způsob úhrady:</td>
+                                @*<td style="padding: 0pt; text-align: right;">@(_translationService.GetResource(paymentMethodText, order.CustomerLanguageId))</td>*@
+                                <td style="padding: 0pt; text-align: right;">@Html.Raw(paymentMethodText)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 0pt;">Variabilní symbol:</td>
+                                <td style="padding: 0pt; text-align: right;">@invoiceNumber</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 0pt;">Banka:</td>
+                                <td style="padding: 0pt; text-align: right;">@store.BankAccount.BankName</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 0pt;">Číslo účtu:</td>
+                                <td style="padding: 0pt; text-align: right;">@($"{store.BankAccount.AccountNumber}/{store.BankAccount.BankCode}")</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <p>Obchodní údaje:</p>
+                    <hr />
+                </div>
+            </div>
+
+            if (!string.IsNullOrEmpty(_pdfSettings.InvoiceHeaderText))
+            {
+                <div>@Html.Raw(_pdfSettings.InvoiceHeaderText)</div>
+            }
+
+            <div class="summary">
+                @(_translationService.GetResource("PDFInvoice.Product(s)", order.CustomerLanguageId))
+            </div>
+            @if (priceIncludesTax)
+            {
+                <table class="Table">
+                    <tr>
+                        <td class="Header leftalign" colspan="2">@(_translationService.GetResource("PDFInvoice.ProductName", order.CustomerLanguageId))</td>
+                        <td class="Header">@(_translationService.GetResource("PDFInvoice.UnitPrice", order.CustomerLanguageId))</td>
+                        <td class="Header" style="width: 30pt;">@(_translationService.GetResource("PDFInvoice.ProductQuantity", order.CustomerLanguageId))</td>
+                        <td class="Header" style="width: 40pt;">@(_translationService.GetResource("PDFInvoice.UnitTaxRate", order.CustomerLanguageId))</td>
+                        <td class="Header">@(_translationService.GetResource("PDFInvoice.PriceTaxExcl", order.CustomerLanguageId))</td>
+                        <td class="Header">@(_translationService.GetResource("PDFInvoice.TaxTotal", order.CustomerLanguageId))</td>
+                        <td class="Header">@(_translationService.GetResource("PDFInvoice.ProductTotal", order.CustomerLanguageId))</td>
+                    </tr>
+                    @foreach (var item in order.OrderItems.Where(x => x.VendorId == Model.Item2 || !limitbyVendor).ToList())
+                    {
+                        double taxTotal = item.PriceInclTax - item.PriceExclTax;
+
+                        <tr>
+                            <td class="autoWidth leftalign" colspan="2" style="padding: 2pt;">
+                                @((await _productService.GetProductByIdIncludeArch(item.ProductId)).Name)
+                                @if (!string.IsNullOrEmpty(item.AttributeDescription))
+                                {
+                                    <br />
+                                    <small>@(Html.Raw(item.AttributeDescription))</small>
+                                }
+                            </td>
+                            <td style="padding: 2pt;">
+                                @item.UnitPriceExclTax.ToString("N2")
+                            </td>
+                            <td style="padding: 2pt;">@item.Quantity</td>
+                            <td style="padding: 2pt;">@item.TaxRate %</td>
+                            <td style="padding: 2pt;">@item.PriceExclTax.ToString("N2")</td>
+                            <td style="padding: 2pt;">@taxTotal.ToString("N2")</td>
+                            <td class="bold" style="padding: 2pt;">
+                                @item.PriceInclTax.ToString("N2")
+                            </td>
+                        </tr>
+                    }
+                </table>
+            }
+            else
+            {
+                <table class="Table">
+                    <tr>
+                        <td class="Header leftalign" colspan="2">@(_translationService.GetResource("PDFInvoice.ProductName", order.CustomerLanguageId))</td>
+                        <td class="Header">@(_translationService.GetResource("PDFInvoice.ProductPrice", order.CustomerLanguageId))</td>
+                        <td class="Header">@(_translationService.GetResource("PDFInvoice.ProductQuantity", order.CustomerLanguageId))</td>
+                        <td class="Header">@(_translationService.GetResource("PDFInvoice.ProductTotal", order.CustomerLanguageId))</td>
+                    </tr>
+                    @foreach (var item in order.OrderItems.Where(x => x.VendorId == Model.Item2 || !limitbyVendor).ToList())
+                    {
+                        <tr>
+                            <td class="autoWidth leftalign" colspan="2">
+                                @((await _productService.GetProductByIdIncludeArch(item.ProductId)).Name)
+                                @if (!string.IsNullOrEmpty(item.AttributeDescription))
+                                {
+                                    <br />
+                                    <small>@(Html.Raw(item.AttributeDescription))</small>
+                                }
+                            </td>
+                            <td>
+                                @if (priceIncludesTax)
+                                {
+                                    @item.UnitPriceInclTax.ToString("N2")
+                                }
+                                else
+                                {
+                                    @item.UnitPriceExclTax.ToString("N2")
+                                }
+                            </td>
+                            <td>@item.Quantity</td>
+                            <td class="bold">
+                                @if (priceIncludesTax)
+                                {
+                                    @item.PriceInclTax.ToString("N2")
+                                }
+                                else
+                                {
+                                    @item.PriceExclTax.ToString("N2")
+                                }
+                            </td>
+                        </tr>
+                    }
+                </table>
+            }
+            @if (!limitbyVendor)
+            {
+                <div class="col-2" style="margin-bottom: 20pt; margin-top: 20pt;">
+                    <div class="col">
+                        @if (priceIncludesTax)
+                        {
+                            <table style="width: 100%;" class="table-no-border text-sm">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 0pt;">Sazba DPH</th>
+                                        <th style="padding: 0pt;">Základ</th>
+                                        <th style="padding: 0pt;">DPH</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in order.OrderTaxes)
+                                    {
+                                        <tr>
+                                            <td style="padding: 0pt;">@item.Percent %</td>
+                                            <td style="padding: 0pt;"></td>
+                                            <td style="padding: 0pt;">@item.Amount.ToString("N2")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                    <div>
+                        <table style="float: right;" class="table-no-border text-sm">
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 0pt; padding-right: 10pt;">@(_translationService.GetResource("PDFInvoice.Sub-Total", order.CustomerLanguageId))</td>
+                                    <td style="padding: 0pt; text-align: right;">
+                                        @if (priceIncludesTax)
+                                        {
+                                            @order.OrderSubtotalInclTax.ToString("N2")
+                                        }
+                                        else
+                                        {
+                                            @order.OrderSubtotalExclTax.ToString("N2")
+                                        }
+                                        @order.CustomerCurrencyCode
+                                    </td>
+                                </tr>
+                                @if (order.OrderSubTotalDiscountInclTax > 0 || order.OrderSubTotalDiscountExclTax > 0)
+                                {
+                                    <tr>
+                                        <td style="padding: 0pt; padding-right: 10pt;">@(_translationService.GetResource("PDFInvoice.Discount", order.CustomerLanguageId))</td>
+                                        <td style="padding: 0pt; text-align: right;">
+                                            @if (priceIncludesTax)
+                                            {
+                                                @order.OrderSubTotalDiscountInclTax.ToString("N2")
+                                            }
+                                            else
+                                            {
+                                                @order.OrderSubTotalDiscountExclTax.ToString("N2")
+                                            }
+                                            @order.CustomerCurrencyCode
+                                        </td>
+                                    </tr>
+                                }
+                                @if (order.PaymentMethodAdditionalFeeInclTax > 0 || order.PaymentMethodAdditionalFeeExclTax > 0)
+                                {
+                                    <tr>
+                                        <td style="padding: 0pt; padding-right: 10pt;">@(_translationService.GetResource("PDFInvoice.PaymentmethodAdditionalFee", order.CustomerLanguageId))</td>
+                                        <td style="padding: 0pt; text-align: right;">
+                                            @if (priceIncludesTax)
+                                            {
+                                                @order.PaymentMethodAdditionalFeeInclTax.ToString("N2")
+                                            }
+                                            else
+                                            {
+                                                @order.PaymentMethodAdditionalFeeExclTax.ToString("N2")
+                                            }
+                                            @order.CustomerCurrencyCode
+                                        </td>
+                                    </tr>
+                                }
+                                <tr>
+                                    <td style="padding: 0pt; padding-right: 10pt;">@(_translationService.GetResource("PDFInvoice.Shipping", order.CustomerLanguageId))</td>
+                                    <td style="padding: 0pt; text-align: right;">
+                                        @if (priceIncludesTax)
+                                        {
+                                            @order.OrderShippingInclTax.ToString("N2")
+                                        }
+                                        else
+                                        {
+                                            @order.OrderShippingExclTax.ToString("N2")
+                                        }
+                                        @order.CustomerCurrencyCode
+                                    </td>
+                                </tr>
+                                @if (order.OrderDiscount > 0)
+                                {
+                                    <tr>
+                                        <td style="padding: 0pt; padding-right: 10pt;">@(_translationService.GetResource("PDFInvoice.Discount", order.CustomerLanguageId))</td>
+                                        <td style="padding: 0pt; text-align: right;">
+                                            @order.OrderDiscount.ToString("N2")
+                                            @order.CustomerCurrencyCode
+                                        </td>
+                                    </tr>
+                                }
+                                @foreach (var gcuh in await _giftVoucherService.GetAllGiftVoucherUsageHistory(order.Id))
+                                {
+                                    if (gcuh.UsedValue > 0)
+                                    {
+                                        var giftvoucher = await _giftVoucherService.GetGiftVoucherById(gcuh.GiftVoucherId);
+
+                                        <tr>
+                                            <td style="padding: 0pt; padding-right: 10pt;">@(string.Format(_translationService.GetResource("PDFInvoice.GiftVoucherInfo", order.CustomerLanguageId), giftvoucher.Code))</td>
+                                            <td style="padding: 0pt; text-align: right;">@gcuh.UsedValue</td>
+                                        </tr>
+                                    }
+                                }
+                                @if (order.OrderTax > 0)
+                                {
+                                    <tr>
+                                        <td style="padding: 0pt; padding-right: 10pt;">@(_translationService.GetResource("PDFInvoice.Tax", order.CustomerLanguageId))</td>
+                                        <td style="padding: 0pt; text-align: right;">
+                                            @order.OrderTax.ToString("N2")
+                                            @order.CustomerCurrencyCode
+                                        </td>
+                                    </tr>
+                                }
+                                
+                                <tr>
+                                    <td style="padding: 0pt; padding-right: 10pt;" class="font-bigger">@(_translationService.GetResource("PDFInvoice.OrderTotal", order.CustomerLanguageId))</td>
+                                    <td style="padding: 0pt; text-align: right;" class="font-bigger">
+                                        @order.OrderTotal.ToString("N2") @order.CustomerCurrencyCode
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+            if (!string.IsNullOrEmpty(_pdfSettings.InvoiceFooterText))
+            {
+                <footer class="footer">
+                    @Html.Raw(_pdfSettings.InvoiceFooterText)
+                </footer>
+            }
+            if (Model.Item1.Count - 1 > i)
+            {
+                <div style="display:block; clear:both; page-break-after:always;"></div>
+            }
+            i++;
+        }
+    </main>
+</body>
+</html>
