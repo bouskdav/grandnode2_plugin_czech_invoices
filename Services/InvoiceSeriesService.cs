@@ -157,5 +157,17 @@ namespace Misc.CzechInvoiceGenerator.Services
 
             return order;
         }
+
+        public Task<bool> IsServiceAvailableForStore(string storeId, DateTime effectiveDate)
+        {
+            OrderInvoiceSerie latestEffectiveInvoiceSerie = _invoiceSeriesRepository.Table
+                .Where(i =>
+                    i.From <= effectiveDate &&
+                    (!i.LimitedToStores || i.Stores.Contains(storeId)))
+                .OrderByDescending(i => i.From)
+                .FirstOrDefault();
+
+            return Task.FromResult(latestEffectiveInvoiceSerie != null);
+        }
     }
 }

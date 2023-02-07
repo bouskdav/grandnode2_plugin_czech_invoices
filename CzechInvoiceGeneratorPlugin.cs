@@ -63,6 +63,10 @@ namespace Misc.CzechInvoiceGenerator
             await this.AddOrUpdatePluginTranslateResource(_translationService, _languageService, "Misc.CzechInvoiceGenerator.DisplayOrder", "Display order");
             await this.AddOrUpdatePluginTranslateResource(_translationService, _languageService, "Misc.CzechInvoiceGenerator.CustomerGroups", "Customer groups");
             await this.AddOrUpdatePluginTranslateResource(_translationService, _languageService, "Misc.CzechInvoiceGenerator.Stores", "Stores");
+            
+            await this.AddOrUpdatePluginTranslateResource(_translationService, _languageService, "Plugins.Misc.CzechInvoiceGenerator.Fields.Invoices", "Invoices");
+            await this.AddOrUpdatePluginTranslateResource(_translationService, _languageService, "Plugins.Misc.CzechInvoiceGenerator.Fields.InvoiceSettings", "Invoice settings");
+            await this.AddOrUpdatePluginTranslateResource(_translationService, _languageService, "Plugins.Misc.CzechInvoiceGenerator.Fields.InvoiceList", "List of invoices");
 
             await base.Install();
         }

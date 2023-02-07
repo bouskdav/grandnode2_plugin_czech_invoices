@@ -8,7 +8,9 @@ namespace Misc.CzechInvoiceGenerator
         private readonly ITranslationService _translationService;
         private readonly CzechInvoiceGeneratorSettings _czechInvoiceGeneratorSettings;
 
-        public CzechInvoiceGeneratorProvider(ITranslationService translationService, CzechInvoiceGeneratorSettings czechInvoiceGeneratorSettings)
+        public CzechInvoiceGeneratorProvider(
+            ITranslationService translationService, 
+            CzechInvoiceGeneratorSettings czechInvoiceGeneratorSettings)
         {
             _translationService = translationService;
             _czechInvoiceGeneratorSettings = czechInvoiceGeneratorSettings;

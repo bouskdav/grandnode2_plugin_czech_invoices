@@ -451,9 +451,11 @@
                                 <tbody>
                                     @foreach (var item in order.OrderTaxes)
                                     {
+                                        var taxBaseSum = order.OrderItems.Where(i => i.TaxRate == item.Percent).Sum(i => i.PriceExclTax);
+
                                         <tr>
                                             <td style="padding: 0pt;">@item.Percent %</td>
-                                            <td style="padding: 0pt; text-align: right;"></td>
+                                            <td style="padding: 0pt; text-align: right;">@taxBaseSum.ToString("N2")</td>
                                             <td style="padding: 0pt; text-align: right;">@item.Amount.ToString("N2")</td>
                                         </tr>
                                     }

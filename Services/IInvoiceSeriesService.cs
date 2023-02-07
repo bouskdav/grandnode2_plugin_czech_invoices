@@ -31,5 +31,7 @@ namespace Misc.CzechInvoiceGenerator.Services
         Task DeleteInvoiceSerie(OrderInvoiceSerie slide);
 
         Task<Order> SetNextAvailableNumberForOrder(Order order, DateTime effectiveDate);
+
+        Task<bool> IsServiceAvailableForStore(string storeId, DateTime effectiveDate);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Grand.Business.Core.Interfaces.Common.Pdf;
 using Grand.Infrastructure;
+using Grand.Web.Common.Menu;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -16,6 +17,8 @@ namespace Misc.CzechInvoiceGenerator
             services.Replace(ServiceDescriptor.Scoped<IPdfService, CzechPdfService>());
 
             services.AddScoped<IInvoiceSeriesService, InvoiceSeriesService>();
+
+            services.AddScoped<IAdminMenuProvider, CzechInvoiceGeneratorMenuProvider>();
         }
 
         public int Priority => 200;
