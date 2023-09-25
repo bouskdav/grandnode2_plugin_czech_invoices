@@ -45,7 +45,7 @@
 		</None>
 	</ItemGroup>
 	<ItemGroup>
-		<PackageReference Include="Scryber.Core.Mvc" Version="6.0.0.14-beta" />
+		<PackageReference Include="Scryber.Core.Mvc" Version="6.0.1-beta" />
 		<PackageReference Include="Scryber.Core.OpenType" Version="6.0.0.5-beta" />
 	</ItemGroup>
 </Project>

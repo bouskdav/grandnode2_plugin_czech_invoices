@@ -6,7 +6,6 @@ using Misc.CzechInvoiceGenerator;
     FriendlyName = "CzechInvoiceGenerator",
     Group = "Invoices",
     SystemName = CzechInvoiceGeneratorDefaults.ProviderSystemName,
-    SupportedVersion = GrandVersion.SupportedPluginVersion,
     Author = "Laguna Solutions",
     Version = "1.0"
 )]
